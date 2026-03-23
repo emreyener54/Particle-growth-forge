@@ -38,7 +38,7 @@ export default function HeroSection() {
           <Button
             size="lg"
             className="bg-primary text-primary-foreground hover:bg-primary/90 font-display font-semibold text-base px-8 py-6 rounded-xl transition-all duration-300 hover:scale-105"
-            onClick={() => window.location.href = "mailto:info@yenersolutions.com"}
+            onClick={() => window.location.href = "mailto:emre@yenersolutions.com"}
           >
             Contact Us
           </Button>
