@@ -5,6 +5,26 @@ export default function HeroSection() {
     <section id="hero" className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-radial pointer-events-none" />
+
+      {/*
+        ═══ A SCRIM, BECAUSE THE GLOW ABOVE IS NOT ONE ═══
+
+        `bg-gradient-radial` adds cyan light at the centre. It is decoration, and against
+        the particle cloud it makes the contrast WORSE — the headline and the sentence
+        under it were being read through both a trophy and a glow.
+
+        This is the background colour itself, densest exactly where the copy sits and gone
+        by the edges, so the cloud stays fully visible around the text and disappears
+        behind it. The particles are the thing people notice; the sentence is the thing
+        they have to be able to read.
+      */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse 60% 42% at 50% 48%, hsl(220 30% 3% / 0.92) 0%, hsl(220 30% 3% / 0.75) 45%, transparent 78%)',
+        }}
+      />
       
       <div className="relative z-10 text-center max-w-3xl mx-auto px-6 mt-16">
         

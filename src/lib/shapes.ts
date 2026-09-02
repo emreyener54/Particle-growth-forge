@@ -2,49 +2,116 @@ import * as THREE from 'three';
 
 const PARTICLE_COUNT = 3000;
 
+/**
+ * The trophy the hero morphs into.
+ *
+ * ═══ WHY IT WAS REWRITTEN ═══
+ *
+ * The original read like a trophy in its comments and was not one in its arithmetic. The
+ * branch labelled "Cup bowl (top half) - half sphere" was:
+ *
+ *     positions[i3]     = (Math.random() - 0.5) * 2;
+ *     positions[i3 + 1] = (Math.random() - 0.5) * 2;
+ *     positions[i3 + 2] = (Math.random() - 0.5) * 2;
+ *
+ * — three independent uniform randoms, which is a solid CUBE. Thirty-five per cent of
+ * every particle went into a shapeless block. The "stem" used the branch selector as its
+ * height, so it came out as a squat disc a fraction of a unit tall; the "base" was a full
+ * sphere of radius 1 sitting inside the cube. Composited, it read as a blob with two ears.
+ *
+ * ═══ HOW THIS ONE IS BUILT ═══
+ *
+ * Each part is placed from its own parameters rather than from the random number that
+ * chose it — that coupling is what produced the disc. Particles are distributed on
+ * SURFACES, not through volumes: a cloud of points is only legible as an object when it
+ * describes an outline, and filling the interior spends particles where they cannot be
+ * seen and blurs the silhouette that carries the shape.
+ */
 function generateTrophyPoints(): Float32Array {
   const positions = new Float32Array(PARTICLE_COUNT * 3);
-  for (let i = 0; i < PARTICLE_COUNT; i++) {
+
+  //: Proportions of a cup, top to bottom. The bowl is the widest thing and reads first,
+  //: so it gets the most particles; the stem is thin and needs few to be understood.
+  const BOWL = 0.44;
+  const RIM = 0.14;
+  const HANDLES = 0.14;
+  const STEM = 0.10;
+  const PLINTH = 1 - BOWL - RIM - HANDLES - STEM;
+
+  const bowlTop = 0.95;
+  const bowlBottom = 0.05;
+  const rimRadius = 0.78;
+
+  //: The bowl narrows towards the bottom, quickly at first and then less — a cup profile,
+  //: not a cone. `y` runs 0 at the base of the bowl to 1 at the rim.
+  const bowlRadius = (y: number) => 0.24 + rimRadius * Math.pow(y, 0.62);
+
+  let i = 0;
+  const put = (x: number, y: number, z: number) => {
     const i3 = i * 3;
+    positions[i3] = x;
+    positions[i3 + 1] = y;
+    positions[i3 + 2] = z;
+    i += 1;
+  };
+
+  const count = (share: number) => Math.round(PARTICLE_COUNT * share);
+
+  // ── bowl: a surface of revolution ──────────────────────────────────────────────────
+  for (let n = 0; n < count(BOWL); n += 1) {
     const t = Math.random();
-    
-    if (t < 0.35) {
-      // Cup bowl (top half) - half sphere
-      positions[i3] = (Math.random() - 0.5) * 2;
-      positions[i3 + 1] = (Math.random() - 0.5) * 2;
-      positions[i3 + 2] = (Math.random() - 0.5) * 2;
-    } else if (t < 0.55) {
-      // Stem
-      const radius = Math.random() * (1 - t);
-      const angle = Math.random() * Math.PI * 2;
-      positions[i3] = Math.cos(angle) * radius;
-      positions[i3 + 1] = t * 2 - 1; // vertical taper
-      positions[i3 + 2] = Math.sin(angle) * radius;
-    } else if (t < 0.7) {
-      // Base
-      const phi = Math.acos(2 * Math.random() - 1);
-      const theta = Math.random() * 2 * Math.PI;
-      const r = 1 + Math.random() * 0.05;
-      positions[i3] = r * Math.sin(phi) * Math.cos(theta);
-      positions[i3 + 1] = r * Math.cos(phi);
-      positions[i3 + 2] = r * Math.sin(phi) * Math.sin(theta);
-    } else if (t < 0.85) {
-      // Handles
-      const side = Math.random() > 0.5 ? 1 : -1;
-      const angle = (Math.random() - 0.5) * Math.PI * 0.8;
-      const r = 0.35;
-      positions[i3] = side * (1.2 + Math.cos(angle) * r);
-      positions[i3 + 1] = 0.6 + Math.sin(angle) * r;
-      positions[i3 + 2] = (Math.random() - 0.5) * 0.1;
+    const y = bowlBottom + (bowlTop - bowlBottom) * t;
+    const r = bowlRadius(t);
+    const a = Math.random() * Math.PI * 2;
+    put(Math.cos(a) * r, y, Math.sin(a) * r * 0.9);
+  }
+
+  // ── rim: a dense ring, because the top edge is what makes it read as a cup ─────────
+  for (let n = 0; n < count(RIM); n += 1) {
+    const a = Math.random() * Math.PI * 2;
+    const r = rimRadius + 0.02 + (Math.random() - 0.5) * 0.03;
+    put(Math.cos(a) * r, bowlTop + (Math.random() - 0.5) * 0.04, Math.sin(a) * r * 0.9);
+  }
+
+  // ── handles: open arcs on the silhouette, both in the same plane as the widest axis ─
+  for (let n = 0; n < count(HANDLES); n += 1) {
+    const side = n % 2 === 0 ? 1 : -1;
+    //: Just over half a turn, opening outward, so it reads as a loop attached at two
+    //: points rather than a circle floating beside the cup.
+    const a = -Math.PI * 0.55 + Math.random() * Math.PI * 1.1;
+    const r = 0.3;
+    const cx = 0.72;
+    const cy = 0.62;
+    put(side * (cx + Math.cos(a) * r), cy + Math.sin(a) * r, (Math.random() - 0.5) * 0.06);
+  }
+
+  // ── stem ───────────────────────────────────────────────────────────────────────────
+  for (let n = 0; n < count(STEM); n += 1) {
+    const t = Math.random();
+    const y = -0.42 + t * 0.47;
+    //: Pinched in the middle, flaring where it meets the bowl and the plinth.
+    const r = 0.1 + 0.09 * Math.abs(t - 0.5) * 2;
+    const a = Math.random() * Math.PI * 2;
+    put(Math.cos(a) * r, y, Math.sin(a) * r);
+  }
+
+  // ── plinth: a slab, drawn as edges rather than filled ──────────────────────────────
+  for (let n = i; n < PARTICLE_COUNT; n += 1) {
+    const w = 0.46;
+    const h = 0.16;
+    const yTop = -0.42;
+    const t = Math.random();
+    const a = Math.random() * Math.PI * 2;
+    if (t < 0.5) {
+      //: The vertical faces — the part that gives it thickness.
+      put(Math.cos(a) * w, yTop - Math.random() * h, Math.sin(a) * w * 0.8);
     } else {
-      // Rim highlights
-      const angle = Math.random() * Math.PI * 2;
-      const r = 1.15 + Math.random() * 0.1;
-      positions[i3] = Math.cos(angle) * r;
-      positions[i3 + 1] = 1.0 + (Math.random() - 0.5) * 0.05;
-      positions[i3 + 2] = Math.sin(angle) * r * 0.6;
+      //: Top and bottom edges, which is what a slab is at this distance.
+      const r = w * (0.55 + Math.random() * 0.45);
+      put(Math.cos(a) * r, Math.random() < 0.5 ? yTop : yTop - h, Math.sin(a) * r * 0.8);
     }
   }
+
   return positions;
 }
 

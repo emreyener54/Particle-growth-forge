@@ -61,6 +61,18 @@ const SECTION_IDS = ['hero', ...SERVICES.map(s => s.id)];
 
 export default function Index() {
   const [activeShape, setActiveShape] = useState<ShapeKey>('trophy');
+  /**
+   * ═══ WHICH HALF OF THE ROW THE PARTICLES BELONG IN ═══
+   *
+   * `ServiceSection` reserves half its row for them — an empty `lg:w-1/2` spacer that
+   * swaps sides on alternate sections. The canvas never used it: it was `fixed inset-0`,
+   * so it painted across the whole viewport while that reserved half sat empty and the
+   * particles ran straight through the body copy beside it.
+   *
+   * The side follows the same alternation the sections use, so the cloud lands in the gap
+   * that was always meant for it.
+   */
+  const [side, setSide] = useState<'left' | 'right' | 'center'>('center');
 
   const handleScroll = useCallback(() => {
     const scrollY = window.scrollY;
@@ -74,8 +86,12 @@ export default function Index() {
         if (rect.top < vh * 0.6) {
           if (i === 0) {
             setActiveShape('trophy');
+            setSide('center');
           } else {
             setActiveShape(SERVICES[i - 1].shape);
+            //: ServiceSection renders even indices as `lg:flex-row` (spacer first, so the
+            //: particles are on the left) and odd as `lg:flex-row-reverse`.
+            setSide((i - 1) % 2 === 0 ? 'left' : 'right');
           }
           break;
         }
@@ -92,10 +108,25 @@ export default function Index() {
     <div className="relative bg-background min-h-screen">
       <Navbar />
       
-      {/* Fixed particle canvas */}
+      {/*
+        Still fixed, so the morph between shapes runs continuously rather than restarting
+        as sections scroll past — but no longer full-bleed. On a wide screen it occupies
+        the half the current section leaves empty. Below `lg` there are no halves: the
+        layout stacks, so the cloud goes back behind the content and drops to a third
+        opacity, where it reads as texture instead of competing with the words on top of it.
+      */}
       <ParticleScene
         activeShape={activeShape}
-        className="fixed inset-0 z-0 pointer-events-none"
+        className={[
+          'fixed inset-y-0 z-0 pointer-events-none transition-[left,right,opacity] duration-700 ease-out',
+          'inset-x-0 opacity-30',
+          'lg:opacity-100',
+          side === 'left' ? 'lg:left-0 lg:right-1/2' : '',
+          side === 'right' ? 'lg:left-1/2 lg:right-0' : '',
+          side === 'center' ? 'lg:inset-x-0' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
       />
 
       {/* Content overlay */}
